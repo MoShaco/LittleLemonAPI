@@ -33,7 +33,7 @@ class CategoryView(generics.RetrieveUpdateDestroyAPIView):
         return [ permission () for permission in permission_classes]
 
 class MenuItemsView(generics.ListCreateAPIView):
-    queryset = MenuItem
+    queryset = MenuItem.objects.all()
     serializer_class = MenuItemSerializer
 
     def get_permissions(self):
