@@ -4,9 +4,9 @@ from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
-from .permissions import IsManager, IsDeliveryCrew, IsManagerOrDeliveryCrew
-from .models import Category, MenuItem
-from .serializers import CategorySerializer, MenuItemSerializer
+from .permissions import IsManager, IsDeliveryCrew, IsManagerOrDeliveryCrew, IsCustomer
+from .models import Category, MenuItem, Cart
+from .serializers import CategorySerializer, MenuItemSerializer, CartSerializer
 # Create your views here.
 
 
@@ -36,7 +36,7 @@ class CategoryView(generics.RetrieveUpdateDestroyAPIView):
         return [ permission () for permission in permission_classes]
 
 class MenuItemsView(generics.ListCreateAPIView):
-    queryset = MenuItem.objects.all()
+    queryset = MenuItem.objects.select_related('category').all()
     serializer_class = MenuItemSerializer
 
     def get_permissions(self):
@@ -183,3 +183,37 @@ class DeliveryCrewUserView(APIView):
             {"message": f"User {user.username} is removed from Delivery Crew Group"}, 
             status=status.HTTP_200_OK
             )
+
+
+class CartView(APIView):
+    permission_classes =  [IsCustomer]
+
+    def get(self, request):
+        items = Cart.objects.filter(user=request.user)
+        serialized_items = CartSerializer(items, many=True)
+        return Response(serialized_items.data, status=status.HTTP_200_OK)
+        
+    def post(self, reqeust):
+        # Get the current user
+        user = reqeust.user
+
+        data = reqeust.data.copy()
+        data['user'] = user.id
+
+        serializer = CartSerializer(data=data, context={'request': reqeust})
+        
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, reqeust):
+        """ Empty the user cart (delete all of the menuitems)"""
+
+        cart_items = Cart.objects.filter(user=reqeust.user)
+        if cart_items.exists():
+            cart_items.delete()
+            return Response({"message": "All items have been deleted from your cart"}, status=status.HTTP_200_OK)
+        else:
+            return Response({"message": "Your cart is already empty"}, status=status.HTTP_204_NO_CONTENT)

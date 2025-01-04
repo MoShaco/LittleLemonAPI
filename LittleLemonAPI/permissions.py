@@ -26,3 +26,16 @@ class IsManagerOrDeliveryCrew(BasePermission):
             return False
         
         return request.user.groups.filter(name__in = ['Manager', 'Delivery Crew']).exists()
+
+
+class IsCustomer(BasePermission):
+    """
+        Custom permissin to grant access to authenticated users who are not part of specific groups.
+    """
+    EXCLUDED_GROUPS = ['Manager', 'Delivery Crew']
+    
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        
+        return not request.user.groups.filter(name__in = self.EXCLUDED_GROUPS).exists()
