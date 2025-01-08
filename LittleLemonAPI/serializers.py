@@ -1,5 +1,6 @@
+import datetime
 from rest_framework import serializers
-from .models import Category, MenuItem, Cart
+from .models import Category, MenuItem, Cart, Order, OrderItem
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -56,3 +57,63 @@ class CartSerializer(serializers.ModelSerializer):
         validated_data['unit_price'] = menuitem.price
         validated_data['price'] = quantity * menuitem.price
         return super().create(validated_data)
+    
+class OrderItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OrderItem
+        fields = ['id', 'menuitem', 'quantity', 'unit_price', 'price']
+
+class OrderSerializer(serializers.ModelSerializer):
+    order_items = OrderItemSerializer(source='orderitem_set', many=True, read_only=True)
+    class Meta:
+        model = Order
+        fields = ['id', 'user', 'delivery_crew', 'status', 'total', 'date', 'order_items']
+        read_only_fields = ['user', 'total', 'date']
+    
+    def validate(self, data):
+        # Query for carts 
+        user = self.context['request'].user
+        existing_cart = Cart.objects.filter(user=user)
+        if not existing_cart:
+            raise serializers.ValidationError(f"The cart of the user {user.username} is empty")
+        
+        return data
+
+    def create(self, validated_data):
+       
+       # Get the current user
+       user = self.context['request'].user
+
+       # Create an order
+       order = Order.objects.create(
+           user=user,
+           total=0,
+           date=datetime.date.today(),
+       )
+
+       # Create orderitems
+       total = 0
+       cart_items = Cart.objects.filter(user=user)
+
+       for item in cart_items:
+           OrderItem.objects.create(
+               order=order,
+               menuitem=item.menuitem,
+               quantity=item.quantity,
+               unit_price=item.unit_price,
+               price=item.price
+           )
+           total += item.price
+       # Update the order total price
+       order.total = total
+       order.save()
+       
+       # Delete the cart
+       cart_items.delete()
+
+       return order
+    
+class OrderItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OrderItem
+        fields = ['id', 'menuitem', 'quantity', 'unit_price', 'price']

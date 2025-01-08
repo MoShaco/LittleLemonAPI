@@ -5,8 +5,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from .permissions import IsManager, IsDeliveryCrew, IsManagerOrDeliveryCrew, IsCustomer
-from .models import Category, MenuItem, Cart
-from .serializers import CategorySerializer, MenuItemSerializer, CartSerializer
+from .models import Category, MenuItem, Cart, Order, OrderItem
+from .serializers import CategorySerializer, MenuItemSerializer, CartSerializer, OrderSerializer, OrderItemSerializer
 # Create your views here.
 
 
@@ -217,3 +217,24 @@ class CartView(APIView):
             return Response({"message": "All items have been deleted from your cart"}, status=status.HTTP_200_OK)
         else:
             return Response({"message": "Your cart is already empty"}, status=status.HTTP_204_NO_CONTENT)
+
+
+class OrderView(APIView):
+    permission_classes = [IsCustomer]
+    def get(self, request):
+        orders = Order.objects.filter(user=request.user).prefetch_related('orderitem_set')
+        serializer = OrderSerializer(orders, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    def post(self, request):
+        """ Create an order from the user's cart """
+
+        # Pass the data to OrderSerializer
+        serialized_items = OrderSerializer(data={}, context={'request': request})
+
+        # Validate and save
+        if serialized_items.is_valid():
+            order = serialized_items.save()
+            return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
+        
+        return Response(serialized_items.errors, status=status.HTTP_400_BAD_REQUEST)
