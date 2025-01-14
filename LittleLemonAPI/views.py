@@ -221,9 +221,19 @@ class CartView(APIView):
 
 
 class OrderView(APIView):
-    permission_classes = [IsCustomer]
     def get(self, request):
-        orders = Order.objects.filter(user=request.user).prefetch_related('orderitem_set')
+        """ Retrieve orders baesd on user role. """
+
+        user = request.user
+
+        if IsManager().has_permission(request, self):
+            orders = Order.objects.all()
+        elif IsDeliveryCrew().has_permission(request, self):
+            orders = Order.objects.filter(delivery_crew=user)
+        else:
+            orders = Order.objects.filter(user=user)
+
+        orders = orders.prefetch_related('orderitem_set')
         serializer = OrderSerializer(orders, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
@@ -239,7 +249,16 @@ class OrderView(APIView):
             return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
         
         return Response(serialized_items.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def get_permissions(self):
+        permission_classes = []
+        if self.request.method == 'GET':
+            permission_classes = [IsAuthenticated]
+        else:
+            permission_classes = [IsCustomer]
+        return [ permission () for permission in permission_classes]
 
+        
 
 @api_view(['GET'])
 @permission_classes([IsCustomer])
