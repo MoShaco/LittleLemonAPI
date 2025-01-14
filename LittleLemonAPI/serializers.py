@@ -114,6 +114,21 @@ class OrderSerializer(serializers.ModelSerializer):
        return order
     
 class OrderItemSerializer(serializers.ModelSerializer):
+    menuitem = serializers.SerializerMethodField()
     class Meta:
         model = OrderItem
         fields = ['id', 'menuitem', 'quantity', 'unit_price', 'price']
+    
+
+    def get_menuitem(self, obj):
+        menuitem_data = {
+            'id': obj.menuitem.id,
+            'title': obj.menuitem.title,
+            'category': {
+                'id': obj.menuitem.category.id,
+                'title': obj.menuitem.category.title,
+                'slug': obj.menuitem.category.slug
+            }
+        
+        }
+        return menuitem_data

@@ -4,6 +4,7 @@ from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from rest_framework.decorators import api_view, permission_classes
 from .permissions import IsManager, IsDeliveryCrew, IsManagerOrDeliveryCrew, IsCustomer
 from .models import Category, MenuItem, Cart, Order, OrderItem
 from .serializers import CategorySerializer, MenuItemSerializer, CartSerializer, OrderSerializer, OrderItemSerializer
@@ -238,3 +239,22 @@ class OrderView(APIView):
             return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
         
         return Response(serialized_items.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+@permission_classes([IsCustomer])
+def orderItems(request, pk):
+    """Retrieve all menu items for a specific order."""
+    ...
+    # Try to get the order
+    order = get_object_or_404(Order, pk=pk)
+
+    # check if the current use is authorized
+    if order.user != request.user:
+        return Response({'error': 'You are unauthorized to access this order'}, status=status.HTTP_403_FORBIDDEN)
+    
+    # return the menuietms
+    order_items = OrderItem.objects.filter(order=order)
+    serialized_items = OrderItemSerializer(order_items, many=True)
+
+    return Response(serialized_items.data, status=status.HTTP_200_OK)
